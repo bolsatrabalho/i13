@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Frequência de Bolsistas</title>
+<style>
+body { font-family: Arial, sans-serif; padding: 20px; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+th { background: #eee; }
+select, input[type="text"] { width: 100%; }
+button { padding: 6px 10px; margin: 2px; cursor: pointer; }
+.admin-area { margin-bottom: 15px; }
+.hidden { display: none; }
+</style>
+</head>
+<body>
+
+<h2>Frequência de Bolsistas</h2>
+
+<div class="admin-area hidden" id="adminArea">
+  <button onclick="adicionarBolsista()">Adicionar Bolsista</button>
+  <button onclick="vincularBolsista()">Vincular Bolsista</button>
+</div>
+
+<table id="tabela">
+  <thead>
+    <tr>
+      <th>Matrícula</th>
+      <th>Nome</th>
+      <th>Setor</th>
+      <th>Jan</th><th>Fev</th><th>Mar</th><th>Abr</th>
+      <th>Mai</th><th>Jun</th><th>Jul</th><th>Ago</th>
+      <th>Set</th><th>Out</th><th>Nov</th><th>Dez</th>
+      <th>Justificativa</th>
+      <th>Arquivo</th>
+      <th>Ações</th>
+    </tr>
+  </thead>
+  <tbody id="tbody"></tbody>
+</table>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbxZOYdKpvSBCt4sKsV0dMhI4D3yMokvvrR_htQbdK9GZo-5rvSFPJ-ryN7zkhwwx_DJxg/exec";
+
+const email = sessionStorage.getItem("coordenadorLogado") || "";
+const isAdmin = email === "bolsatrabalho@prex.uespi.br";
+
+if (isAdmin) {
+  document.getElementById("adminArea").classList.remove("hidden");
+}
+
+function criarSelect(valor="") {
+  const s = document.createElement("select");
+  ["", "SIM", "NÃO"].forEach(v => {
+    const o = document.createElement("option");
+    o.value = v;
+    o.textContent = v === "" ? "" : v;
+    if (v === valor) o.selected = true;
+    s.appendChild(o);
+  });
+  return s;
+}
+
+function carregarDados() {
+  fetch(`${API_URL}?acao=listar&email=${email}`)
+    .then(r => r.json())
+    .then(lista => {
+      if (!Array.isArray(lista)) lista = [];
+      montarTabela(lista);
+    })
+    .catch(() => {
+      montarTabela([]);
+    });
+}
+
+function montarTabela(lista) {
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = "";
+
+  if (lista.length === 0 && isAdmin) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="18">Nenhum bolsista cadastrado</td>`;
+    tbody.appendChild(tr);
+    return;
+  }
+
+  lista.forEach(b => {
+    const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+      <td>${b.Matricula || ""}</td>
+      <td>${b["Nome do bolsista"] || ""}</td>
+      <td>${b.Setor || ""}</td>
+    `;
+
+    ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"].forEach(m => {
+      const td = document.createElement("td");
+      const sel = criarSelect(b[m] || "");
+      if (isAdmin) sel.disabled = true;
+      td.appendChild(sel);
+      tr.appendChild(td);
+    });
+
+    const tdJust = document.createElement("td");
+    const inpJust = document.createElement("input");
+    inpJust.value = b.Justificativa || "";
+    if (isAdmin) inpJust.disabled = true;
+    tdJust.appendChild(inpJust);
+    tr.appendChild(tdJust);
+
+    const tdArq = document.createElement("td");
+    const inpFile = document.createElement("input");
+    inpFile.type = "file";
+    if (isAdmin) inpFile.disabled = true;
+    tdArq.appendChild(inpFile);
+    tr.appendChild(tdArq);
+
+    const tdAcoes = document.createElement("td");
+    if (isAdmin) {
+      const btnRem = document.createElement("button");
+      btnRem.textContent = "Remover";
+      btnRem.onclick = () => removerBolsista(b.Matricula);
+      tdAcoes.appendChild(btnRem);
+    } else {
+      const btnEnv = document.createElement("button");
+      btnEnv.textContent = "Enviar";
+      btnEnv.onclick = () => enviarLinha(b.Matricula, tr);
+      tdAcoes.appendChild(btnEnv);
+    }
+    tr.appendChild(tdAcoes);
+
+    tbody.appendChild(tr);
+  });
+}
+
+function enviarLinha(matricula, tr) {
+  if (!confirm("Deseja enviar os dados?")) return;
+
+  const tds = tr.querySelectorAll("td");
+  const dados = {
+    matricula,
+    meses: [],
+    justificativa: tds[15].querySelector("input").value
+  };
+
+  for (let i = 3; i <= 14; i++) {
+    dados.meses.push(tds[i].querySelector("select").value);
+  }
+
+  fetch(API_URL, {
+    method: "POST",
+    body: JSON.stringify({ acao: "salvar", dados })
+  })
+  .then(() => alert("Enviado com sucesso"))
+  .catch(() => alert("Erro ao enviar"));
+}
+
+function adicionarBolsista() {
+  alert("Função de adicionar bolsista (admin)");
+}
+
+function vincularBolsista() {
+  const email = prompt("E-mail do coordenador:");
+  if (!email) return;
+  alert("Vinculação feita para: " + email);
+}
+
+function removerBolsista(mat) {
+  if (!confirm("Remover bolsista?")) return;
+  alert("Removido: " + mat);
+}
+
+carregarDados();
+</script>
+
+</body>
+</html>
